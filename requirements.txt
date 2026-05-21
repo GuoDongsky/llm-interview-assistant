@@ -1,0 +1,5 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+openai>=1.88
+python-docx>=1.1
+PyMuPDF>=1.24
