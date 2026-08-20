@@ -32,16 +32,24 @@
 
 ## 快速开始
 
-需要 Python 3.10+。
+需要 **Python 3.10 或更高版本**。先确认一下：
+
+```bash
+python3 --version
+```
+
+macOS 自带的 `python3` 通常是 3.9，版本不够。可以用 Homebrew 装一个新的
+（`brew install python@3.12`），然后把下面命令里的 `python3` 换成 `python3.12`。
+版本不对时程序会直接告诉你，不会报一堆看不懂的错。
 
 ### 1. 安装依赖
 
 ```bash
-python -m venv .venv
+python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements.txt
 ```
 
-Windows：
+Windows（PowerShell）：
 
 ```powershell
 python -m venv .venv
