@@ -3,116 +3,208 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LLM 面试助手</title>
-    <link rel="stylesheet" href="/static/styles.css?v=6" />
+    <title>HRMate · 面试助手</title>
+    <meta name="description" content="集中管理岗位信息、候选人简历和面试记录，生成岗位匹配分析、面试总结与面试建议。" />
+    <link rel="stylesheet" href="/static/styles.css?v=12" />
   </head>
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div>
-          <h1>LLM 面试助手</h1>
-          <p>集中管理面试记录、简历和岗位信息，再生成总结或匹配分析。</p>
+        <div class="topbar-inner">
+          <div class="brand">
+            <span class="brand-text">
+              <span class="brand-name">HRMate</span>
+              <span class="brand-tagline">集中管理岗位信息、候选人简历和面试记录，再生成匹配分析或总结。</span>
+            </span>
+          </div>
+          <div class="status-pill" id="healthStatus" role="status">检测配置中</div>
         </div>
-        <div class="status-pill" id="healthStatus">检测配置中</div>
       </header>
 
       <main class="layout-shell">
         <aside class="resource-sidebar">
-          <div class="sidebar-header">
-            <div>
-              <h2>资料中心</h2>
-              <span>本页资料不会保存到数据库</span>
-            </div>
-            <button class="ghost-button" id="clearButton" type="button">清空</button>
-          </div>
+          <details class="sidebar-collapse" id="sidebarCollapse" open>
+            <summary class="sidebar-summary">
+              <span>资料中心</span>
+              <span class="sidebar-summary-hint">岗位 / 简历 / 面试记录</span>
+            </summary>
 
-          <section class="resource-card">
-            <div class="resource-card-header">
-              <div>
-                <h3>面试记录</h3>
-                <p id="interviewStatus">未上传</p>
+            <div class="sidebar-body">
+              <div class="sidebar-header">
+                <div>
+                  <h2>资料中心</h2>
+                  <span>本页资料不会保存到数据库</span>
+                </div>
+                <button class="ghost-button" id="clearButton" type="button">清空</button>
               </div>
-              <span class="source-badge required">必需</span>
-            </div>
-            <label class="upload-box compact-upload" for="fileInput" id="dropZone">
-              <input id="fileInput" type="file" accept=".txt,.md,.markdown,.docx" />
-              <strong>上传 txt / md / Word</strong>
-              <span>也可在下方直接粘贴</span>
-            </label>
-            <div class="file-meta" id="fileMeta">尚未上传文件</div>
-            <details class="edit-details" open>
-              <summary>查看 / 编辑面试记录</summary>
-              <textarea
-                id="interviewText"
-                class="text-area source-text-area"
-                placeholder="粘贴面试记录文本。"
-              ></textarea>
-            </details>
-          </section>
 
-          <section class="resource-card">
-            <div class="resource-card-header">
-              <div>
-                <h3>候选人简历</h3>
-                <p id="resumeStatus">未上传</p>
-              </div>
-              <span class="source-badge optional">匹配分析</span>
-            </div>
-            <label class="upload-box compact-upload" for="resumeInput" id="resumeDropZone">
-              <input id="resumeInput" type="file" accept=".docx,.pdf" />
-              <strong>上传 PDF / Word</strong>
-              <span>只用于岗位匹配分析</span>
-            </label>
-            <div class="file-meta" id="resumeMeta">尚未上传简历</div>
-            <details class="edit-details">
-              <summary>查看 / 编辑简历文本</summary>
-              <textarea
-                id="resumeText"
-                class="text-area source-text-area"
-                placeholder="上传简历后会显示解析文本，也可以直接粘贴简历内容。"
-              ></textarea>
-            </details>
-          </section>
-
-          <section class="resource-card">
-            <div class="resource-card-header">
-              <div>
+              <section class="resource-card">
                 <h3>岗位信息</h3>
                 <p id="jobStatus">未填写</p>
-              </div>
-              <span class="source-badge optional">匹配分析</span>
+                <label class="field-label" for="jobDescription">岗位名称 / JD / 任职要求</label>
+                <textarea
+                  id="jobDescription"
+                  class="text-area job-area"
+                  placeholder="可一次性粘贴岗位名称、岗位职责、任职要求和团队关注点。"
+                ></textarea>
+              </section>
+
+              <section class="resource-card">
+                <h3>候选人简历</h3>
+                <p id="resumeStatus">未上传</p>
+                <label class="upload-box compact-upload" for="resumeInput" id="resumeDropZone">
+                  <input id="resumeInput" type="file" accept=".docx,.pdf" />
+                  <svg class="upload-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                  <strong>上传 PDF / Word</strong>
+                  <span>也可拖拽到此处，或在下方直接粘贴</span>
+                </label>
+                <div class="file-meta" id="resumeMeta">尚未上传简历</div>
+                <details class="edit-details">
+                  <summary>查看 / 编辑简历文本</summary>
+                  <textarea
+                    id="resumeText"
+                    class="text-area source-text-area"
+                    placeholder="上传简历后会显示解析文本，也可以直接粘贴简历内容。"
+                  ></textarea>
+                </details>
+              </section>
+
+              <section class="resource-card">
+                <h3>面试记录</h3>
+                <p id="interviewStatus">未上传</p>
+                <label class="upload-box compact-upload" for="fileInput" id="dropZone">
+                  <input id="fileInput" type="file" accept=".txt,.md,.markdown,.docx" />
+                  <svg class="upload-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+                  </svg>
+                  <strong>上传 txt / md / Word</strong>
+                  <span>也可拖拽到此处，或在下方直接粘贴</span>
+                </label>
+                <div class="file-meta" id="fileMeta">尚未上传文件</div>
+                <details class="edit-details">
+                  <summary>查看 / 编辑面试记录</summary>
+                  <textarea
+                    id="interviewText"
+                    class="text-area source-text-area"
+                    placeholder="粘贴面试记录文本。"
+                  ></textarea>
+                </details>
+              </section>
             </div>
-            <label class="field-label" for="jobDescription">岗位名称 / JD / 任职要求</label>
-            <textarea
-              id="jobDescription"
-              class="text-area job-area"
-              placeholder="可一次性粘贴岗位名称、岗位职责、任职要求和团队关注点。"
-            ></textarea>
-          </section>
+          </details>
         </aside>
 
         <section class="workbench">
           <div class="task-tabs" role="tablist" aria-label="任务">
-            <button class="tab-button active" id="summaryTabButton" type="button" data-tab="summary">面试总结</button>
-            <button class="tab-button" id="adviceTabButton" type="button" data-tab="advice">面试建议</button>
-            <button class="tab-button" id="matchTabButton" type="button" data-tab="match">岗位匹配分析</button>
+            <button
+              class="tab-button active"
+              id="matchTabButton"
+              type="button"
+              role="tab"
+              aria-selected="true"
+              aria-controls="matchPanel"
+              data-tab="match"
+            >
+              岗位匹配分析
+            </button>
+            <button
+              class="tab-button"
+              id="summaryTabButton"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="summaryPanel"
+              tabindex="-1"
+              data-tab="summary"
+            >
+              面试总结
+            </button>
+            <button
+              class="tab-button"
+              id="adviceTabButton"
+              type="button"
+              role="tab"
+              aria-selected="false"
+              aria-controls="advicePanel"
+              tabindex="-1"
+              data-tab="advice"
+            >
+              面试建议
+            </button>
           </div>
 
-          <section class="task-panel active" id="summaryPanel" data-panel="summary">
-            <div class="task-header">
-              <div>
+          <section
+            class="task-panel active"
+            id="matchPanel"
+            data-panel="match"
+            role="tabpanel"
+            aria-labelledby="matchTabButton"
+          >
+            <div class="task-topbar">
+              <div class="task-header">
+                <h2>岗位匹配分析</h2>
+                <p>使用岗位信息、候选人简历和面试记录，三项至少提供一项；提供得越全，结论越可靠。</p>
+              </div>
+              <div class="task-actions">
+                <button class="ghost-button" id="copyMatchButton" type="button" data-default-label="复制结果">复制结果</button>
+                <button class="primary-button" id="matchButton" type="button">生成分析</button>
+              </div>
+            </div>
+
+            <div class="source-checklist">
+              <span>本次分析使用（至少一项）</span>
+              <strong data-source="job">岗位信息</strong>
+              <strong data-source="resume">候选人简历</strong>
+              <strong data-source="interview">面试记录</strong>
+            </div>
+
+            <details class="advanced-settings">
+              <summary>高级设置：匹配分析提示词</summary>
+              <div class="prompt-header">
+                <label class="field-label" for="promptTemplate">匹配分析提示词</label>
+                <div class="prompt-actions">
+                  <button class="ghost-button" id="savePromptButton" type="button">保存提示词</button>
+                  <button class="ghost-button" id="resetPromptButton" type="button">恢复默认</button>
+                </div>
+              </div>
+              <div class="prompt-save-status" id="matchPromptStatus"></div>
+              <textarea id="promptTemplate" class="text-area prompt-area"></textarea>
+            </details>
+
+            <div
+              class="result-box primary-result"
+              id="matchResult"
+              data-state="empty"
+              aria-live="polite"
+              tabindex="0"
+            >匹配度分析会显示在这里。</div>
+          </section>
+
+          <section
+            class="task-panel"
+            id="summaryPanel"
+            data-panel="summary"
+            role="tabpanel"
+            aria-labelledby="summaryTabButton"
+          >
+            <div class="task-topbar">
+              <div class="task-header">
                 <h2>面试总结</h2>
                 <p>仅使用面试记录，不读取简历、岗位 JD 或匹配分析结果。</p>
               </div>
               <div class="task-actions">
-                <button class="ghost-button" id="copySummaryButton" type="button">复制结果</button>
+                <button class="ghost-button" id="copySummaryButton" type="button" data-default-label="复制结果">复制结果</button>
                 <button class="primary-button" id="summarizeButton" type="button">生成总结</button>
               </div>
             </div>
 
             <div class="source-checklist">
               <span>本次总结使用</span>
-              <strong>面试记录</strong>
+              <strong data-source="interview">面试记录</strong>
             </div>
 
             <details class="advanced-settings">
@@ -128,77 +220,95 @@
               <textarea id="summaryPromptTemplate" class="text-area prompt-area"></textarea>
             </details>
 
-            <div class="result-box primary-result" id="summaryResult">
-              <span class="empty-state">总结结果会显示在这里。</span>
-            </div>
+            <div
+              class="result-box primary-result"
+              id="summaryResult"
+              data-state="empty"
+              aria-live="polite"
+              tabindex="0"
+            >总结结果会显示在这里。</div>
           </section>
 
-          <section class="task-panel" id="advicePanel" data-panel="advice">
-            <div class="task-header">
-              <div>
+          <section
+            class="task-panel"
+            id="advicePanel"
+            data-panel="advice"
+            role="tabpanel"
+            aria-labelledby="adviceTabButton"
+          >
+            <div class="task-topbar">
+              <div class="task-header">
                 <h2>面试建议</h2>
                 <p>根据岗位信息、简历、前序面试记录和本轮设置，为面试官生成可执行建议。</p>
               </div>
               <div class="task-actions">
-                <button class="ghost-button" id="copyAdviceButton" type="button">复制结果</button>
+                <button class="ghost-button" id="copyAdviceButton" type="button" data-default-label="复制结果">复制结果</button>
                 <button class="primary-button" id="adviceButton" type="button">生成建议</button>
               </div>
             </div>
 
             <div class="source-checklist">
               <span>本次建议使用</span>
-              <strong>岗位信息</strong>
-              <strong>候选人简历</strong>
-              <strong>前序面试记录</strong>
-              <strong>本轮设置</strong>
+              <strong data-source="job">岗位信息</strong>
+              <strong data-source="resume">候选人简历</strong>
+              <strong data-source="interview">前序面试记录</strong>
+              <strong data-source="settings">本轮设置</strong>
             </div>
 
             <div class="advice-form">
-              <label class="field-label" for="interviewStage">面试阶段</label>
-              <select id="interviewStage" class="input">
-                <option value="初面">初面</option>
-                <option value="后续面试">后续面试</option>
-                <option value="终面">终面</option>
-              </select>
+              <div>
+                <label class="field-label" for="interviewStage">面试阶段</label>
+                <select id="interviewStage" class="input">
+                  <option value="初面">初面</option>
+                  <option value="后续面试">后续面试</option>
+                  <option value="终面">终面</option>
+                </select>
+              </div>
 
-              <label class="field-label" for="jobType">岗位类型 / 职能方向</label>
-              <select id="jobType" class="input">
-                <option value="产品">产品</option>
-                <option value="技术">技术</option>
-                <option value="客服">客服</option>
-                <option value="销售">销售</option>
-                <option value="运营">运营</option>
-                <option value="市场">市场</option>
-                <option value="设计">设计</option>
-                <option value="财务">财务</option>
-                <option value="人事">人事</option>
-                <option value="管理岗">管理岗</option>
-                <option value="其他">其他</option>
-              </select>
+              <div>
+                <label class="field-label" for="jobType">岗位类型 / 职能方向</label>
+                <select id="jobType" class="input">
+                  <option value="产品">产品</option>
+                  <option value="技术">技术</option>
+                  <option value="客服">客服</option>
+                  <option value="销售">销售</option>
+                  <option value="运营">运营</option>
+                  <option value="市场">市场</option>
+                  <option value="设计">设计</option>
+                  <option value="财务">财务</option>
+                  <option value="人事">人事</option>
+                  <option value="管理岗">管理岗</option>
+                  <option value="其他">其他</option>
+                </select>
+              </div>
 
-              <label class="field-label" for="interviewerRole">面试官角色</label>
-              <select id="interviewerRole" class="input">
-                <option value="HR">HR</option>
-                <option value="直属上级 / 用人经理">直属上级 / 用人经理</option>
-                <option value="业务面试官">业务面试官</option>
-                <option value="专业能力面试官">专业能力面试官</option>
-                <option value="部门负责人">部门负责人</option>
-                <option value="高管 / 终面">高管 / 终面</option>
-                <option value="自定义">自定义</option>
-              </select>
+              <div>
+                <label class="field-label" for="interviewerRole">面试官角色</label>
+                <select id="interviewerRole" class="input">
+                  <option value="HR">HR</option>
+                  <option value="直属上级 / 用人经理">直属上级 / 用人经理</option>
+                  <option value="业务面试官">业务面试官</option>
+                  <option value="专业能力面试官">专业能力面试官</option>
+                  <option value="部门负责人">部门负责人</option>
+                  <option value="高管 / 终面">高管 / 终面</option>
+                  <option value="自定义">自定义</option>
+                </select>
+              </div>
 
-              <label class="field-label" for="interviewGoal">本轮面试目标</label>
-              <select id="interviewGoal" class="input">
-                <option value="基础匹配">基础匹配</option>
-                <option value="专业能力">专业能力</option>
-                <option value="业务经验">业务经验</option>
-                <option value="沟通协作">沟通协作</option>
-                <option value="管理能力">管理能力</option>
-                <option value="稳定性 / 动机">稳定性 / 动机</option>
-                <option value="价值观 / 组织匹配">价值观 / 组织匹配</option>
-                <option value="补充验证前序疑点">补充验证前序疑点</option>
-                <option value="自定义">自定义</option>
-              </select>
+              <div>
+                <label class="field-label" for="interviewGoal">本轮面试目标</label>
+                <select id="interviewGoal" class="input">
+                  <option value="基础匹配">基础匹配</option>
+                  <option value="专业能力">专业能力</option>
+                  <option value="业务经验">业务经验</option>
+                  <option value="沟通协作">沟通协作</option>
+                  <option value="管理能力">管理能力</option>
+                  <option value="稳定性 / 动机">稳定性 / 动机</option>
+                  <option value="价值观 / 组织匹配">价值观 / 组织匹配</option>
+                  <option value="补充验证前序疑点">补充验证前序疑点</option>
+                  <option value="自定义">自定义</option>
+                </select>
+              </div>
             </div>
 
             <label class="field-label" for="additionalFocus">需要补充验证的信息</label>
@@ -221,51 +331,21 @@
               <textarea id="advicePromptTemplate" class="text-area prompt-area"></textarea>
             </details>
 
-            <div class="result-box primary-result" id="adviceResult">
-              <span class="empty-state">面试建议会显示在这里。</span>
-            </div>
-          </section>
-
-          <section class="task-panel" id="matchPanel" data-panel="match">
-            <div class="task-header">
-              <div>
-                <h2>岗位匹配分析</h2>
-                <p>使用面试记录、候选人简历和岗位信息，不读取面试总结结果。</p>
-              </div>
-              <div class="task-actions">
-                <button class="ghost-button" id="copyMatchButton" type="button">复制结果</button>
-                <button class="primary-button" id="matchButton" type="button">生成分析</button>
-              </div>
-            </div>
-
-            <div class="source-checklist">
-              <span>本次分析使用</span>
-              <strong>面试记录</strong>
-              <strong>候选人简历</strong>
-              <strong>岗位信息</strong>
-            </div>
-
-            <details class="advanced-settings">
-              <summary>高级设置：匹配分析提示词</summary>
-              <div class="prompt-header">
-                <label class="field-label" for="promptTemplate">匹配分析提示词</label>
-                <div class="prompt-actions">
-                  <button class="ghost-button" id="savePromptButton" type="button">保存提示词</button>
-                  <button class="ghost-button" id="resetPromptButton" type="button">恢复默认</button>
-                </div>
-              </div>
-              <div class="prompt-save-status" id="matchPromptStatus"></div>
-              <textarea id="promptTemplate" class="text-area prompt-area"></textarea>
-            </details>
-
-            <div class="result-box primary-result" id="matchResult">
-              <span class="empty-state">匹配度分析会显示在这里。</span>
-            </div>
+            <div
+              class="result-box primary-result"
+              id="adviceResult"
+              data-state="empty"
+              aria-live="polite"
+              tabindex="0"
+            >面试建议会显示在这里。</div>
           </section>
         </section>
       </main>
+
+      <!--ICP_FOOTER-->
     </div>
 
-    <script src="/static/app.js?v=8"></script>
+    <script src="/static/markdown.js?v=12"></script>
+    <script src="/static/app.js?v=12"></script>
   </body>
 </html>

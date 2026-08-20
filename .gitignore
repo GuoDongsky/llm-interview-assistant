@@ -16,3 +16,8 @@ Thumbs.db
 node_modules/
 dist/
 build/
+.claude/
+
+# 本地运维笔记，含服务器与域名信息，不得提交
+CLAUDE.local.md
+*.local.md

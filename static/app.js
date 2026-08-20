@@ -51,16 +51,23 @@ const elements = {
   matchButton: document.querySelector("#matchButton"),
   copyMatchButton: document.querySelector("#copyMatchButton"),
   matchResult: document.querySelector("#matchResult"),
+  sidebarCollapse: document.querySelector("#sidebarCollapse"),
   tabButtons: Array.from(document.querySelectorAll(".tab-button")),
   taskPanels: Array.from(document.querySelectorAll(".task-panel")),
+  checklistItems: Array.from(document.querySelectorAll(".source-checklist strong")),
 };
 
-function setText(target, text, className = "") {
-  target.className = target.className
-    .split(" ")
-    .filter((item) => !["error-text", "loading"].includes(item))
-    .concat(className ? [className] : [])
-    .join(" ");
+// 结果区展示的是渲染后的 HTML，这里按元素 id 留一份原始 Markdown，
+// 供复制功能使用（复制出来的是带格式的原文，粘进 Word / 飞书能保留结构）。
+const resultRawText = new Map();
+
+/**
+ * 结果区的状态统一走 data-state，样式由 CSS 属性选择器驱动。
+ * state: empty | loading | error | content
+ */
+function setResultState(target, text, state = "empty") {
+  resultRawText.delete(target.id);
+  target.dataset.state = state;
   target.textContent = text;
 }
 
@@ -95,8 +102,20 @@ function clearSavedPrompt(key) {
   }
 }
 
-function getPlainText(target) {
-  return target.textContent.trim();
+/** 上传区下方那行说明文字：idle / loading / ready / error，样式由 CSS 属性选择器驱动。 */
+function setFileMeta(target, text, state = "idle") {
+  target.dataset.state = state;
+  target.textContent = text;
+}
+
+/** 生成按钮的忙碌态：禁用并显示转圈。 */
+function setBusy(button, busy) {
+  button.disabled = busy;
+  if (busy) {
+    button.dataset.busy = "true";
+  } else {
+    delete button.dataset.busy;
+  }
 }
 
 function updateResourceStatus() {
@@ -107,6 +126,18 @@ function updateResourceStatus() {
   elements.interviewStatus.textContent = interviewLength ? `${interviewLength} 字符` : "未上传";
   elements.resumeStatus.textContent = resumeLength ? `${resumeLength} 字符` : "未上传";
   elements.jobStatus.textContent = jobLength ? `${jobLength} 字符` : "未填写";
+
+  // 任务面板顶部的资料清单跟着实际填写情况亮起，而不是一直显示成静态装饰。
+  const ready = {
+    interview: interviewLength > 0,
+    resume: resumeLength > 0,
+    job: jobLength > 0,
+    settings: true,
+  };
+
+  elements.checklistItems.forEach((item) => {
+    item.dataset.ready = String(Boolean(ready[item.dataset.source]));
+  });
 }
 
 function requireInterviewText() {
@@ -151,31 +182,58 @@ async function requestTextStream(url, payload, target) {
     throw new Error(data.detail || "请求失败，请稍后重试。");
   }
 
-  target.className = target.className
-    .split(" ")
-    .filter((item) => !["error-text", "loading"].includes(item))
-    .join(" ");
-  target.textContent = "";
-
   const reader = response.body.getReader();
   const decoder = new TextDecoder("utf-8");
   let fullText = "";
+  let frame = 0;
+  let started = false;
+
+  // 只有当用户本来就贴着底部时才自动滚动，
+  // 这样边生成边往回翻看的时候不会被强行拽到最新内容。
+  const isNearBottom = () =>
+    target.scrollHeight - target.scrollTop - target.clientHeight < 60;
+
+  const paint = () => {
+    frame = 0;
+    const stick = isNearBottom();
+    target.innerHTML = window.renderMarkdown(fullText);
+    if (stick) {
+      target.scrollTop = target.scrollHeight;
+    }
+  };
+
+  // 每帧最多重渲染一次：分片到达得比屏幕刷新快得多，逐片渲染纯属浪费。
+  const schedulePaint = () => {
+    if (!frame) {
+      frame = window.requestAnimationFrame(paint);
+    }
+  };
 
   while (true) {
     const {value, done} = await reader.read();
     if (done) {
       break;
     }
-    const chunk = decoder.decode(value, {stream: true});
-    fullText += chunk;
-    target.textContent += chunk;
-    target.scrollTop = target.scrollHeight;
+    fullText += decoder.decode(value, {stream: true});
+
+    // 连上服务器到模型吐出第一个字之间往往有好几秒，
+    // 这段时间要继续显示「正在连接」而不是先清成一片空白。
+    if (!started && fullText.trim()) {
+      started = true;
+      target.dataset.state = "content";
+      target.textContent = "";
+    }
+
+    if (started) {
+      schedulePaint();
+    }
   }
 
-  const remaining = decoder.decode();
-  if (remaining) {
-    fullText += remaining;
-    target.textContent += remaining;
+  fullText += decoder.decode();
+
+  if (frame) {
+    window.cancelAnimationFrame(frame);
+    frame = 0;
   }
 
   if (fullText.includes("[ERROR]")) {
@@ -186,6 +244,12 @@ async function requestTextStream(url, payload, target) {
   if (!fullText.trim()) {
     throw new Error("LLM 返回了空结果，请稍后重试。");
   }
+
+  // 收尾再完整渲染一次，保证最后一个分片一定被画出来。
+  // 也覆盖「内容全部在最后一次刷新里到达」的情况——那时状态还停在 loading。
+  target.dataset.state = "content";
+  target.innerHTML = window.renderMarkdown(fullText);
+  resultRawText.set(target.id, fullText);
 
   return fullText;
 }
@@ -239,9 +303,15 @@ async function loadDefaultPrompt() {
   );
 }
 
-function switchTab(tabName) {
+function switchTab(tabName, {focusTab = false} = {}) {
   elements.tabButtons.forEach((button) => {
-    button.classList.toggle("active", button.dataset.tab === tabName);
+    const active = button.dataset.tab === tabName;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+    if (active && focusTab) {
+      button.focus();
+    }
   });
   elements.taskPanels.forEach((panel) => {
     panel.classList.toggle("active", panel.dataset.panel === tabName);
@@ -253,7 +323,7 @@ async function uploadFile(file) {
     return;
   }
 
-  elements.fileMeta.textContent = `正在解析：${file.name}`;
+  setFileMeta(elements.fileMeta, `正在解析：${file.name}`, "loading");
 
   try {
     const data = await requestJson("/api/parse-file", {
@@ -265,10 +335,10 @@ async function uploadFile(file) {
       body: file,
     });
     elements.interviewText.value = data.text;
-    elements.fileMeta.textContent = `${data.filename} · ${data.char_count} 字符`;
+    setFileMeta(elements.fileMeta, `${data.filename} · ${data.char_count} 字符`, "ready");
     updateResourceStatus();
   } catch (error) {
-    elements.fileMeta.textContent = error.message;
+    setFileMeta(elements.fileMeta, error.message, "error");
   }
 }
 
@@ -277,7 +347,7 @@ async function uploadResume(file) {
     return;
   }
 
-  elements.resumeMeta.textContent = `正在解析：${file.name}`;
+  setFileMeta(elements.resumeMeta, `正在解析：${file.name}`, "loading");
 
   try {
     const data = await requestJson("/api/parse-resume", {
@@ -289,10 +359,10 @@ async function uploadResume(file) {
       body: file,
     });
     elements.resumeText.value = data.text;
-    elements.resumeMeta.textContent = `${data.filename} · ${data.char_count} 字符`;
+    setFileMeta(elements.resumeMeta, `${data.filename} · ${data.char_count} 字符`, "ready");
     updateResourceStatus();
   } catch (error) {
-    elements.resumeMeta.textContent = error.message;
+    setFileMeta(elements.resumeMeta, error.message, "error");
   }
 }
 
@@ -301,18 +371,18 @@ async function summarize() {
   try {
     interviewText = requireInterviewText();
   } catch (error) {
-    setText(elements.summaryResult, error.message, "error-text");
+    setResultState(elements.summaryResult, error.message, "error");
     return;
   }
 
   const promptTemplate = elements.summaryPromptTemplate.value.trim();
   if (!promptTemplate) {
-    setText(elements.summaryResult, "请填写面试总结提示词。", "error-text");
+    setResultState(elements.summaryResult, "请填写面试总结提示词。", "error");
     return;
   }
 
-  elements.summarizeButton.disabled = true;
-  setText(elements.summaryResult, "正在连接 DeepSeek，开始后会实时显示内容。", "loading");
+  setBusy(elements.summarizeButton, true);
+  setResultState(elements.summaryResult, "正在连接 DeepSeek，开始后会实时显示内容。", "loading");
 
   try {
     await requestTextStream(
@@ -324,38 +394,36 @@ async function summarize() {
       elements.summaryResult,
     );
   } catch (error) {
-    setText(elements.summaryResult, error.message, "error-text");
+    setResultState(elements.summaryResult, error.message, "error");
   } finally {
-    elements.summarizeButton.disabled = false;
+    setBusy(elements.summarizeButton, false);
   }
 }
 
 async function analyzeMatch() {
-  let interviewText = "";
-  try {
-    interviewText = requireInterviewText();
-  } catch (error) {
-    setText(elements.matchResult, error.message, "error-text");
-    switchTab("match");
-    return;
-  }
-
+  // 岗位信息、候选人简历、面试记录都是可选的，但至少要有一项，
+  // 否则没有任何材料可供分析。后端 AnalyzeMatchRequest 有同样的校验。
   const jobDescription = elements.jobDescription.value.trim();
   const resumeText = elements.resumeText.value.trim();
+  const interviewText = elements.interviewText.value.trim();
   const promptTemplate = elements.promptTemplate.value.trim();
 
-  if (!jobDescription) {
-    setText(elements.matchResult, "请先填写岗位信息。", "error-text");
+  if (!jobDescription && !resumeText && !interviewText) {
+    setResultState(
+      elements.matchResult,
+      "请至少提供岗位信息、候选人简历、面试记录中的一项。",
+      "error",
+    );
     return;
   }
 
   if (!promptTemplate) {
-    setText(elements.matchResult, "请填写匹配分析提示词。", "error-text");
+    setResultState(elements.matchResult, "请填写匹配分析提示词。", "error");
     return;
   }
 
-  elements.matchButton.disabled = true;
-  setText(elements.matchResult, "正在连接 DeepSeek，开始后会实时显示内容。", "loading");
+  setBusy(elements.matchButton, true);
+  setResultState(elements.matchResult, "正在连接 DeepSeek，开始后会实时显示内容。", "loading");
 
   try {
     await requestTextStream(
@@ -369,9 +437,9 @@ async function analyzeMatch() {
       elements.matchResult,
     );
   } catch (error) {
-    setText(elements.matchResult, error.message, "error-text");
+    setResultState(elements.matchResult, error.message, "error");
   } finally {
-    elements.matchButton.disabled = false;
+    setBusy(elements.matchButton, false);
   }
 }
 
@@ -382,18 +450,18 @@ async function generateAdvice() {
   const promptTemplate = elements.advicePromptTemplate.value.trim();
 
   if (!jobDescription) {
-    setText(elements.adviceResult, "请先填写岗位信息。", "error-text");
+    setResultState(elements.adviceResult, "请先填写岗位信息。", "error");
     switchTab("advice");
     return;
   }
 
   if (!promptTemplate) {
-    setText(elements.adviceResult, "请填写面试建议提示词。", "error-text");
+    setResultState(elements.adviceResult, "请填写面试建议提示词。", "error");
     return;
   }
 
-  elements.adviceButton.disabled = true;
-  setText(elements.adviceResult, "正在连接 DeepSeek，开始后会实时显示内容。", "loading");
+  setBusy(elements.adviceButton, true);
+  setResultState(elements.adviceResult, "正在连接 DeepSeek，开始后会实时显示内容。", "loading");
 
   try {
     await requestTextStream(
@@ -412,18 +480,21 @@ async function generateAdvice() {
       elements.adviceResult,
     );
   } catch (error) {
-    setText(elements.adviceResult, error.message, "error-text");
+    setResultState(elements.adviceResult, error.message, "error");
   } finally {
-    elements.adviceButton.disabled = false;
+    setBusy(elements.adviceButton, false);
   }
 }
 
 async function copyResult(target, button) {
-  const text = getPlainText(target);
-  if (!text || text.includes("会显示在这里")) {
+  const defaultLabel = button.dataset.defaultLabel || "复制结果";
+  // 复制原始 Markdown 而不是渲染后的可见文本，粘进 Word / 飞书能保留标题和列表结构。
+  const text = resultRawText.get(target.id) || "";
+
+  if (!text.trim()) {
     button.textContent = "暂无结果";
     setTimeout(() => {
-      button.textContent = "复制结果";
+      button.textContent = defaultLabel;
     }, 1200);
     return;
   }
@@ -436,21 +507,21 @@ async function copyResult(target, button) {
   }
 
   setTimeout(() => {
-    button.textContent = "复制结果";
+    button.textContent = defaultLabel;
   }, 1200);
 }
 
 function clearAll() {
   elements.fileInput.value = "";
   elements.resumeInput.value = "";
-  elements.fileMeta.textContent = "尚未上传文件";
-  elements.resumeMeta.textContent = "尚未上传简历";
+  setFileMeta(elements.fileMeta, "尚未上传文件");
+  setFileMeta(elements.resumeMeta, "尚未上传简历");
   elements.interviewText.value = "";
   elements.resumeText.value = "";
   elements.jobDescription.value = "";
-  setText(elements.summaryResult, "总结结果会显示在这里。");
-  setText(elements.adviceResult, "面试建议会显示在这里。");
-  setText(elements.matchResult, "匹配度分析会显示在这里。");
+  setResultState(elements.summaryResult, "总结结果会显示在这里。");
+  setResultState(elements.adviceResult, "面试建议会显示在这里。");
+  setResultState(elements.matchResult, "匹配度分析会显示在这里。");
   updateResourceStatus();
 }
 
@@ -486,9 +557,41 @@ elements.jobDescription.addEventListener("input", updateResourceStatus);
 bindUploadDropZone(elements.dropZone, uploadFile);
 bindUploadDropZone(elements.resumeDropZone, uploadResume);
 
-elements.tabButtons.forEach((button) => {
+elements.tabButtons.forEach((button, index) => {
   button.addEventListener("click", () => switchTab(button.dataset.tab));
+
+  // 标签栏的键盘操作：左右方向键切换，Home / End 跳到首尾。
+  button.addEventListener("keydown", (event) => {
+    const count = elements.tabButtons.length;
+    let next = null;
+
+    if (event.key === "ArrowRight") {
+      next = (index + 1) % count;
+    } else if (event.key === "ArrowLeft") {
+      next = (index - 1 + count) % count;
+    } else if (event.key === "Home") {
+      next = 0;
+    } else if (event.key === "End") {
+      next = count - 1;
+    }
+
+    if (next !== null) {
+      event.preventDefault();
+      switchTab(elements.tabButtons[next].dataset.tab, {focusTab: true});
+    }
+  });
 });
+
+// 平板及以下默认收起资料区，先让用户看到任务和生成按钮；
+// 回到宽屏时必须重新展开，否则折叠条已被隐藏、内容就再也打不开了。
+const compactQuery = window.matchMedia("(max-width: 1120px)");
+
+function syncSidebarMode() {
+  elements.sidebarCollapse.open = !compactQuery.matches;
+}
+
+compactQuery.addEventListener("change", syncSidebarMode);
+syncSidebarMode();
 
 elements.clearButton.addEventListener("click", clearAll);
 elements.summarizeButton.addEventListener("click", summarize);

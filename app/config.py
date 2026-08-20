@@ -29,6 +29,7 @@ class Settings:
     deepseek_base_url: str
     deepseek_model: str
     llm_timeout_seconds: float
+    icp_number: str = ""
     max_upload_bytes: int = 10 * 1024 * 1024
 
     @property
@@ -43,4 +44,5 @@ def get_settings() -> Settings:
         deepseek_base_url=os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
         deepseek_model=os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash"),
         llm_timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "60")),
+        icp_number=os.getenv("ICP_NUMBER", "").strip(),
     )
